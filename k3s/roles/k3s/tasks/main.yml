@@ -49,35 +49,32 @@
   register: k3s_token_raw
   when: inventory_hostname == groups['masters'][0]
 
-# Set K3s token as a global fact
-- name: Set K3s token fact globally
-  set_fact:
-    k3s_token: "{{ k3s_token_raw.content | b64decode }}"
-  when: k3s_token_raw.content is defined
-  run_once: true
-
-# Propagate the K3s token to all nodes
-- name: Distribute K3s token to all nodes
-  set_fact:
-    k3s_token: "{{ hostvars[groups['masters'][0]].k3s_token }}"
-  when: "'k3s_token' not in hostvars[inventory_hostname]"
-  delegate_to: "{{ item }}"
-  with_items: "{{ groups['all'] }}"
-
+# Get master node IP
 - name: Get master node IP
   command: hostname -I
   register: master_ip_raw
   when: inventory_hostname == groups['masters'][0]
 
-- name: Set master IP fact
+- name: Set K3s token and master IP facts globally
   set_fact:
+    k3s_token: "{{ k3s_token_raw.content | b64decode }}"
     master_ip: "{{ master_ip_raw.stdout.split()[0] }}"
-  when: inventory_hostname == groups['masters'][0]
+  when: k3s_token_raw.content is defined and master_ip_raw.stdout is defined
+  run_once: true
+
+# Propagate the K3s token and master IP to all nodes
+- name: Distribute K3s token and master IP to all nodes
+  set_fact:
+    k3s_token: "{{ hostvars[groups['masters'][0]].k3s_token }}"
+    master_ip: "{{ hostvars[groups['masters'][0]].master_ip }}"
+  when: "'k3s_token' not in hostvars[inventory_hostname] or 'master_ip' not in hostvars[inventory_hostname]"
+  delegate_to: "{{ item }}"
+  with_items: "{{ groups['all'] }}"
 
 # Install K3s on other master nodes in HA mode
 - name: Install K3s on other master nodes in HA mode
   shell: |
-    curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION={{ k3s_version }} K3S_TOKEN={{ k3s_token }} sh -s - server --server https://{{ hostvars[groups['masters'][0]].master_ip }}:6443
+    curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION={{ k3s_version }} K3S_TOKEN={{ k3s_token }} sh -s - server --server https://{{ master_ip }}:6443
   when: ha_mode and inventory_hostname != groups['masters'][0]
   args:
     creates: /usr/local/bin/k3s
@@ -85,7 +82,7 @@
 # Install K3s agent on worker nodes
 - name: Install K3s agent on worker nodes
   shell: |
-    curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION={{ k3s_version }} K3S_TOKEN={{ k3s_token }} sh -s - agent --server https://{{ hostvars[groups['masters'][0]].master_ip }}:6443
+    curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION={{ k3s_version }} K3S_TOKEN={{ k3s_token }} sh -s - agent --server https://{{ master_ip }}:6443
   when: inventory_hostname in groups['workers']
   args:
     creates: /usr/local/bin/k3s-agent
@@ -116,7 +113,7 @@
   replace:
     path: /home/{{ ansible_user }}/.kube/config
     regexp: "127.0.0.1"
-    replace: "{{ hostvars[inventory_hostname].master_ip }}"
+    replace: "{{ master_ip }}"
   when: inventory_hostname == groups['masters'][0]
 
 - name: Install Metrics Server
