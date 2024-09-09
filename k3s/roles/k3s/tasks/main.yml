@@ -42,32 +42,23 @@
     timeout: 30
   when: inventory_hostname == groups['masters'][0]
 
-# Get K3s token from the first master node (both HA and non-HA)
-- name: Get K3s token from the first master node
-  slurp:
-    src: /var/lib/rancher/k3s/server/token
-  register: k3s_token_raw
-  when: inventory_hostname == groups['masters'][0]
-
 # Get master node IP
 - name: Get master node IP
   command: hostname -I
   register: master_ip_raw
   when: inventory_hostname == groups['masters'][0]
 
-- name: Set K3s token and master IP facts globally
+- name: Set K3s master IP facts globally
   set_fact:
-    k3s_token: "{{ k3s_token_raw.content | b64decode }}"
     master_ip: "{{ master_ip_raw.stdout.split()[0] }}"
   when: k3s_token_raw.content is defined and master_ip_raw.stdout is defined
   run_once: true
 
 # Propagate the K3s token and master IP to all nodes
-- name: Distribute K3s token and master IP to all nodes
+- name: Distribute master IP to all nodes
   set_fact:
-    k3s_token: "{{ hostvars[groups['masters'][0]].k3s_token }}"
     master_ip: "{{ hostvars[groups['masters'][0]].master_ip }}"
-  when: "'k3s_token' not in hostvars[inventory_hostname] or 'master_ip' not in hostvars[inventory_hostname]"
+  when: "'master_ip' not in hostvars[inventory_hostname]"
   delegate_to: "{{ item }}"
   with_items: "{{ groups['all'] }}"
 
