@@ -87,6 +87,7 @@
 # Copy Kubeconfig to ~/.kube/config on the first master node
 - name: Copy Kubeconfig to user's home directory
   copy:
+    remote_src: yes
     src: /etc/rancher/k3s/k3s.yaml
     dest: /home/{{ ansible_user }}/.kube/config
     owner: "{{ ansible_user }}"
