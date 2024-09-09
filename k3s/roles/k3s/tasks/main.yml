@@ -57,7 +57,7 @@
 
 - name: Set K3s token and master IP facts globally
   set_fact:
-    k3s_token: "{{ k3s_token_raw.content | base64 --decode}}"
+    k3s_token: "{{ k3s_token_raw.content | b64decode }}"
     master_ip: "{{ master_ip_raw.stdout.split()[0] }}"
   when: k3s_token_raw.content is defined and master_ip_raw.stdout is defined
   run_once: true
