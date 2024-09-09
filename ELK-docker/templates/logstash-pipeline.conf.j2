@@ -1,0 +1,14 @@
+input {
+    beats {
+        port => 5044
+    }
+}
+
+output {
+    elasticsearch {
+        hosts => ["http://elasticsearch:9200"]
+        index => "%{[@metadata][beat]}-%{+YYYY.MM.dd}"
+        user => "elastic"               # Gantilah dengan username Elasticsearch Anda
+        password => "asdjhk32478fwbnfsd"     # Gantilah dengan password Elasticsearch Anda
+    }
+}

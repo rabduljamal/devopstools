@@ -1,0 +1,21 @@
+---
+- name: Add Helm stable repo
+  shell: |
+    helm repo add stable https://charts.helm.sh/stable
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+
+- name: Update Helm repo
+  shell: helm repo update
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+
+# - name: Install nginx-ingress using Helm
+#   shell: helm install nginx-ingress stable/nginx-ingress
+#   environment:
+#     KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+
+- name: Verify Helm chart installation
+  command: helm list
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml

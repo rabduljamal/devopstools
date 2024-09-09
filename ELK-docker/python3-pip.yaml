@@ -1,0 +1,31 @@
+---
+- name: Setup Python Virtual Environment
+  hosts: all
+  become: yes
+  tasks:
+    - name: Ensure python3-pip is installed
+      apt:
+        name: python3-pip
+        state: present
+
+    - name: Ensure python3-venv is installed
+      apt:
+        name: python3-venv
+        state: present
+
+    - name: Create Python virtual environment
+      command:
+        cmd: python3 -m venv /home/{{ ansible_user }}/.venv
+        creates: "/home/{{ ansible_user }}/.venv"
+
+    - name: Install packages in virtual environment
+      command:
+        cmd: "/home/{{ ansible_user }}/.venv/bin/pip install kubernetes"
+        
+    - name: Change ownership of .venv directory recursively
+      file:
+        path: "/home/{{ ansible_user }}/.venv"
+        state: directory
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        recurse: yes

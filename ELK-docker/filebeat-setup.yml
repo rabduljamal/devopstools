@@ -1,0 +1,27 @@
+# filebeat-setup.yml
+- hosts: k3s
+  become: yes
+  vars:
+    logstash_host: "192.168.68.110"
+    ansible_python_interpreter: "/home/{{ ansible_user }}/.venv/bin/python3"
+  tasks:
+    - name: Apply Filebeat ConfigMap
+      kubernetes.core.k8s:
+        state: present
+        definition: "{{ lookup('template', 'templates/filebeat-configmap.yaml.j2') }}"
+        namespace: kube-system
+        kubeconfig: /home/{{ ansible_user }}/.kube/config
+
+    - name: Apply Filebeat RBAC
+      kubernetes.core.k8s:
+        state: present
+        definition: "{{ lookup('template', 'templates/filebeat-rbac.yaml.j2') }}"
+        namespace: kube-system
+        kubeconfig: /home/{{ ansible_user }}/.kube/config
+
+    - name: Apply Filebeat DaemonSet
+      kubernetes.core.k8s:
+        state: present
+        definition: "{{ lookup('template', 'templates/filebeat-daemonset.yaml.j2') }}"
+        namespace: kube-system
+        kubeconfig: /home/{{ ansible_user }}/.kube/config

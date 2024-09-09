@@ -1,0 +1,33 @@
+---
+- hosts: vps
+  become: yes
+  vars:
+    # Users yang diizinkan
+    os_security_users_allow:
+      - "root"
+      - "rjamal"
+
+    sysctl_overwrite:
+      net.ipv4.ip_forward: 1
+
+    # SSH Hardening
+    sshd_custom_options:
+      - "LogLevel VERBOSE"
+    ssh_allow_root_with_key: false
+    ssh_permit_root_login: "no"
+    ssh_permit_empty_password: false
+    ssh_allow_tcp_forwarding: true
+    ssh_allow_agent_forwarding: false
+    ssh_allow_x11_forwarding: false
+    # ssh_server_ports:
+    #   - 2212
+    ssh_listen_to:
+      - "0.0.0.0"
+    ssh_use_pam: true
+    ssh_max_auth_retries: 3
+    ssh_max_sessions: 10
+    ssh_login_grace_time: 30
+
+  roles:
+    - devsec.hardening.os_hardening
+    - devsec.hardening.ssh_hardening

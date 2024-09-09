@@ -1,0 +1,27 @@
+---
+- hosts: masters
+  become: yes
+  vars:
+    k3s_version: "v1.24.12+k3s1"
+    ha_mode: true # Jika true, cluster akan dijalankan dalam mode HA
+  roles:
+    - role: common
+    - role: k3s
+
+- hosts: workers
+  become: yes
+  vars:
+    k3s_version: "v1.24.12+k3s1"
+  roles:
+    - role: common
+    - role: k3s
+
+- hosts: "{{ groups['masters'][0] }}" # Hanya di master pertama
+  become: yes
+  vars:
+    rancher_version: "2.7.0"
+  roles:
+    - role: helm
+    - role: helm_chart
+    - role: rancher # Role Rancher hanya diinstal di satu master node
+

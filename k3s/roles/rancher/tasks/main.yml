@@ -1,0 +1,27 @@
+- name: Create namespace for Rancher
+  kubernetes.core.k8s:
+    kubeconfig: /home/{{ ansible_user }}/.kube/config
+    state: present
+    definition:
+      apiVersion: v1
+      kind: Namespace
+      metadata:
+        name: cattle-system
+
+- name: Install Rancher using Helm
+  kubernetes.core.helm:
+    name: rancher
+    chart_ref: rancher-stable/rancher
+    chart_version: "{{ rancher_version  }}"
+    release_namespace: cattle-system
+    kubeconfig: /home/{{ ansible_user }}/.kube/config
+    set_values:
+      - service.type=NodePort
+      - service.nodePorts.https=30001
+    wait: yes
+
+- name: Debug Helm Output
+  shell: |
+    kubectl get pods --namespace cattle-system
+  environment:
+    KUBECONFIG: /home/{{ ansible_user }}/.kube/config

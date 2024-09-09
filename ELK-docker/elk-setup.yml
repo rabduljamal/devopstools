@@ -1,0 +1,70 @@
+# elk-setup.yml
+- hosts: tools
+  become: yes
+  vars:
+    elastic_password: "asdjhk32478fwbnfsd"  # Ganti dengan kata sandi yang aman
+  tasks:
+    - name: Create ELK directories
+      file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+      loop:
+        - /opt/elk
+        - /opt/elk/logstash
+        - /opt/elk/logstash/config
+        - /opt/elk/logstash/pipeline
+        - /opt/elk/elasticsearch
+        - /opt/elk/elasticsearch/config
+        - /opt/elk/certs
+
+    - name: Copy Docker Compose file
+      template:
+        src: templates/docker-compose-elk.yml.j2
+        dest: /opt/elk/docker-compose.yml
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+
+    - name: Copy Elasticsearch configuration
+      template:
+        src: templates/elasticsearch.yml.j2
+        dest: /opt/elk/elasticsearch/config/elasticsearch.yml
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+
+    - name: Copy Elasticsearch certificates
+      copy:
+        src: certs/
+        dest: /opt/elk/certs/
+        mode: '0644'
+        remote_src: no
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+
+    - name: Ensure certificate directory has correct permissions
+      file:
+        path: /opt/elk/certs
+        state: directory
+        mode: '0755'
+        recurse: yes
+
+    - name: Copy Logstash pipeline configuration
+      template:
+        src: templates/logstash-pipeline.conf.j2
+        dest: /opt/elk/logstash/pipeline/logstash.conf
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+
+    - name: Create empty logstash.yml
+      copy:
+        content: ""
+        dest: /opt/elk/logstash/config/logstash.yml
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+
+    - name: Start ELK stack using Docker Compose
+      command: docker compose up -d
+      args:
+        chdir: /opt/elk

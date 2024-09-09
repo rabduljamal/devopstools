@@ -1,0 +1,43 @@
+# ilm-policy.yml
+- hosts: tools
+  become: yes
+  tasks:
+    - name: Create ILM policy
+      uri:
+        url: "http://localhost:9200/_ilm/policy/delete-after-60-days"
+        method: PUT
+        body: '{
+          "policy": {
+            "phases": {
+              "hot": {
+                "actions": {}
+              },
+              "delete": {
+                "min_age": "60d",
+                "actions": {
+                  "delete": {}
+                }
+              }
+            }
+          }
+        }'
+        body_format: json
+        headers:
+          Content-Type: "application/json"
+          Authorization: "Basic ZWxhc3RpYzphc2RqaGszMjQ3OGZ3Ym5mc2Q="
+
+    - name: Apply ILM policy to index template
+      uri:
+        url: "http://localhost:9200/_template/logstash"
+        method: PUT
+        body: '{
+          "index_patterns": ["logstash-*"],
+          "settings": {
+            "index.lifecycle.name": "delete-after-60-days",
+            "index.lifecycle.rollover_alias": "logstash"
+          }
+        }'
+        body_format: json
+        headers:
+          Content-Type: "application/json"
+          Authorization: "Basic ZWxhc3RpYzphc2RqaGszMjQ3OGZ3Ym5mc2Q="
