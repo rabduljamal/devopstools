@@ -120,5 +120,6 @@
   pip:
     name: kubernetes
     state: present
-    executable: pip3 # or pip if using Python 2
+    executable: pip3
+    extra_args: --index-url https://pypi.org/simple
   when: inventory_hostname == groups['masters'][0]
