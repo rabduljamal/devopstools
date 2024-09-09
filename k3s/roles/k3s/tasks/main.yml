@@ -49,13 +49,12 @@
   register: k3s_token_raw
   when: inventory_hostname == groups['masters'][0]
 
-# Set K3s token as a global fact to ensure it is available on all nodes
-- name: Set K3s token fact
-  set_fact:
+# Set K3s token as a global variable accessible by all hosts
+- name: Set K3s token fact globally
+  add_host:
+    name: "all"
     k3s_token: "{{ k3s_token_raw.content | b64decode }}"
   when: k3s_token_raw.content is defined
-  delegate_to: localhost
-  run_once: true
 
 - name: Get master node IP
   command: hostname -I
@@ -70,7 +69,7 @@
 # Install K3s on other master nodes in HA mode
 - name: Install K3s on other master nodes in HA mode
   shell: |
-    curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION={{ k3s_version }} K3S_TOKEN={{ hostvars['localhost'].k3s_token }} sh -s - server --server https://{{ hostvars[groups['masters'][0]].master_ip }}:6443
+    curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION={{ k3s_version }} K3S_TOKEN={{ hostvars['all'].k3s_token }} sh -s - server --server https://{{ hostvars[groups['masters'][0]].master_ip }}:6443
   when: ha_mode and inventory_hostname != groups['masters'][0]
   args:
     creates: /usr/local/bin/k3s
@@ -78,7 +77,7 @@
 # Install K3s agent on worker nodes
 - name: Install K3s agent on worker nodes
   shell: |
-    curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION={{ k3s_version }} K3S_TOKEN={{ hostvars['localhost'].k3s_token }} sh -s - agent --server https://{{ hostvars[groups['masters'][0]].master_ip }}:6443
+    curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION={{ k3s_version }} K3S_TOKEN={{ hostvars['all'].k3s_token }} sh -s - agent --server https://{{ hostvars[groups['masters'][0]].master_ip }}:6443
   when: inventory_hostname in groups['workers']
   args:
     creates: /usr/local/bin/k3s-agent
