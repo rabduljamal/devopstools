@@ -39,7 +39,7 @@
 # Get K3s token from the first master node (both HA and non-HA)
 - name: Get K3s token from the first master node
   slurp:
-    src: /var/lib/rancher/k3s/server/node-token
+    src: /var/lib/rancher/k3s/server/token
   register: k3s_token_raw
   when: inventory_hostname == groups['masters'][0] and k3s_installed.stat.exists
 
@@ -73,6 +73,34 @@
   when: inventory_hostname in groups['workers'] and k3s_token is defined
   args:
     creates: /usr/local/bin/k3s-agent
+
+# Ensure the .kube directory exists
+- name: Ensure .kube directory exists
+  file:
+    path: /home/{{ ansible_user }}/.kube
+    state: directory
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: "0755"
+  when: inventory_hostname == groups['masters'][0]
+
+# Copy Kubeconfig to ~/.kube/config on the first master node
+- name: Copy Kubeconfig to user's home directory
+  copy:
+    src: /etc/rancher/k3s/k3s.yaml
+    dest: /home/{{ ansible_user }}/.kube/config
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: "0644"
+  when: inventory_hostname == groups['masters'][0]
+
+# Replace server IP in kubeconfig to point to the first master's IP
+- name: Replace server IP in kubeconfig
+  replace:
+    path: /home/{{ ansible_user }}/.kube/config
+    regexp: "127.0.0.1"
+    replace: "{{ hostvars[inventory_hostname].master_ip }}"
+  when: inventory_hostname == groups['masters'][0]
 
 - name: Install Metrics Server
   become: yes
