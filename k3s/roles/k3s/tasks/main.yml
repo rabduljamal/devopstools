@@ -61,7 +61,7 @@
 # Instal K3s di master lain jika ha_mode == true
 - name: Install K3s on other master nodes in HA mode
   shell: |
-    curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION={{ k3s_version }} K3S_TOKEN={{ hostvars['master1'].k3s_token }} sh -s - server --server https://{{ hostvars['master1'].master_ip }}:6443
+    curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION={{ k3s_version }} K3S_TOKEN={{ hostvars[groups['masters'][0]].k3s_token }} sh -s - server --server https://{{ hostvars[groups['masters'][0]].master_ip }}:6443
   when: ha_mode and inventory_hostname != groups['masters'][0]
   args:
     creates: /usr/local/bin/k3s
@@ -69,7 +69,7 @@
 # Instal agen K3s di node worker
 - name: Install K3s agent on worker nodes
   shell: |
-    curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION={{ k3s_version }} K3S_TOKEN={{ hostvars['master1'].k3s_token }} sh -s - agent --server https://{{ hostvars['master1'].master_ip }}:6443
+    curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION={{ k3s_version }} K3S_TOKEN={{ hostvars[groups['masters'][0]].k3s_token }} sh -s - agent --server https://{{ hostvars[groups['masters'][0]].master_ip }}:6443
   when: inventory_hostname in groups['workers']
   args:
     creates: /usr/local/bin/k3s-agent
