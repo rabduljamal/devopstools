@@ -36,8 +36,8 @@
   args:
     creates: /usr/local/bin/k3s
 
-# Ambil token K3s untuk node master lain jika dalam HA mode
-- name: Get K3s token
+# Get K3s token from the first master node
+- name: Get K3s token from the first master node
   slurp:
     src: /var/lib/rancher/k3s/server/node-token
   register: k3s_token_raw
@@ -47,6 +47,12 @@
   set_fact:
     k3s_token: "{{ k3s_token_raw.content | b64decode }}"
   when: ha_mode and inventory_hostname == groups['masters'][0]
+
+- name: Ensure k3s_token is accessible to workers
+  set_fact:
+    k3s_token: "{{ hostvars[groups['masters'][0]].k3s_token }}"
+  when: ha_mode and inventory_hostname in groups['workers']
+  delegate_to: "{{ groups['masters'][0] }}"
 
 - name: Get master node IP
   command: hostname -I
