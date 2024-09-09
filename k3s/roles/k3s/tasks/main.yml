@@ -36,17 +36,17 @@
   args:
     creates: /usr/local/bin/k3s
 
-# Get K3s token from the first master node
+# Get K3s token from the first master node (both HA and non-HA)
 - name: Get K3s token from the first master node
   slurp:
     src: /var/lib/rancher/k3s/server/node-token
   register: k3s_token_raw
-  when: ha_mode and inventory_hostname == groups['masters'][0]
+  when: inventory_hostname == groups['masters'][0] and k3s_installed.stat.exists
 
 - name: Set K3s token fact
   set_fact:
     k3s_token: "{{ k3s_token_raw.content | b64decode }}"
-  when: inventory_hostname == groups['masters'][0]
+  when: k3s_token_raw.content is defined and inventory_hostname == groups['masters'][0]
 
 - name: Get master node IP
   command: hostname -I
@@ -66,11 +66,11 @@
   args:
     creates: /usr/local/bin/k3s
 
-# Instal agen K3s di node worker
+# Instal agen K3s di worker nodes (baik HA maupun non-HA)
 - name: Install K3s agent on worker nodes
   shell: |
     curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION={{ k3s_version }} K3S_TOKEN={{ k3s_token }} sh -s - agent --server https://{{ hostvars[groups['masters'][0]].master_ip }}:6443
-  when: inventory_hostname in groups['workers']
+  when: inventory_hostname in groups['workers'] and k3s_token is defined
   args:
     creates: /usr/local/bin/k3s-agent
 
