@@ -20,7 +20,7 @@
     - /var/lib/rancher
   when: k3s_installed.stat.exists
 
-# Jika ha_mode == true dan ini adalah master pertama, gunakan --cluster-init
+# Install K3s on the first master node
 - name: Install K3s on first master node with cluster-init in HA mode
   shell: |
     curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION={{ k3s_version }} sh -s - server --cluster-init
@@ -28,7 +28,6 @@
   args:
     creates: /usr/local/bin/k3s
 
-# Jika tidak dalam HA mode (hanya satu master), instal K3s tanpa --cluster-init
 - name: Install K3s on first and only master node in non-HA mode
   shell: |
     curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION={{ k3s_version }} sh -s - server
@@ -36,17 +35,27 @@
   args:
     creates: /usr/local/bin/k3s
 
+# Wait for the K3s token to be available
+- name: Wait for K3s token to be generated
+  wait_for:
+    path: /var/lib/rancher/k3s/server/token
+    timeout: 30
+  when: inventory_hostname == groups['masters'][0]
+
 # Get K3s token from the first master node (both HA and non-HA)
 - name: Get K3s token from the first master node
   slurp:
     src: /var/lib/rancher/k3s/server/token
   register: k3s_token_raw
-  when: inventory_hostname == groups['masters'][0] and k3s_installed.stat.exists
+  when: inventory_hostname == groups['masters'][0]
 
+# Set K3s token as a global fact to ensure it is available on all nodes
 - name: Set K3s token fact
   set_fact:
     k3s_token: "{{ k3s_token_raw.content | b64decode }}"
-  when: k3s_token_raw.content is defined and inventory_hostname == groups['masters'][0]
+  when: k3s_token_raw.content is defined
+  delegate_to: localhost
+  run_once: true
 
 - name: Get master node IP
   command: hostname -I
@@ -58,19 +67,19 @@
     master_ip: "{{ master_ip_raw.stdout.split()[0] }}"
   when: inventory_hostname == groups['masters'][0]
 
-# Instal K3s di master lain jika ha_mode == true
+# Install K3s on other master nodes in HA mode
 - name: Install K3s on other master nodes in HA mode
   shell: |
-    curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION={{ k3s_version }} K3S_TOKEN={{ k3s_token }} sh -s - server --server https://{{ hostvars[groups['masters'][0]].master_ip }}:6443
+    curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION={{ k3s_version }} K3S_TOKEN={{ hostvars['localhost'].k3s_token }} sh -s - server --server https://{{ hostvars[groups['masters'][0]].master_ip }}:6443
   when: ha_mode and inventory_hostname != groups['masters'][0]
   args:
     creates: /usr/local/bin/k3s
 
-# Instal agen K3s di worker nodes (baik HA maupun non-HA)
+# Install K3s agent on worker nodes
 - name: Install K3s agent on worker nodes
   shell: |
-    curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION={{ k3s_version }} K3S_TOKEN={{ k3s_token }} sh -s - agent --server https://{{ hostvars[groups['masters'][0]].master_ip }}:6443
-  when: inventory_hostname in groups['workers'] and k3s_token is defined
+    curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION={{ k3s_version }} K3S_TOKEN={{ hostvars['localhost'].k3s_token }} sh -s - agent --server https://{{ hostvars[groups['masters'][0]].master_ip }}:6443
+  when: inventory_hostname in groups['workers']
   args:
     creates: /usr/local/bin/k3s-agent
 
