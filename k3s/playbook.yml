@@ -1,14 +1,5 @@
 ---
-- hosts: masters
-  become: yes
-  vars:
-    k3s_version: "v1.24.12+k3s1"
-    ha_mode: false # Jika true, cluster akan dijalankan dalam mode HA
-  roles:
-    - role: common
-    - role: k3s
-
-- hosts: workers
+- hosts: masters, workers
   become: yes
   vars:
     k3s_version: "v1.24.12+k3s1"
