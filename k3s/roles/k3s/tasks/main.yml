@@ -109,3 +109,16 @@
   when: inventory_hostname == groups['masters'][0]
   environment:
     KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+
+- name: Ensure pip is installed
+  package:
+    name: python3-pip
+    state: present
+  when: inventory_hostname == groups['masters'][0]
+
+- name: Install kubernetes library
+  pip:
+    name: kubernetes
+    state: present
+    executable: pip3 # or pip if using Python 2
+  when: inventory_hostname == groups['masters'][0]
