@@ -52,3 +52,41 @@ restart docker compose all
 docker compose down
 docker compose up -d
 ```
+
+## Konfigurasi Vault
+
+Buat Kebijakan untuk Jenkins
+Tentukan kebijakan yang memberikan izin akses ke paths secrets yang diinginkan:
+
+Buat file kebijakan jenkins-policy.hcl dengan konten berikut:
+
+```hcl
+# jenkins-policy.hcl
+path "kv/data/perizinan-event-stage/*" {
+  capabilities = ["read", "list"]
+}
+
+path "kv/data/perizinan-event-production/*" {
+  capabilities = ["read", "list"]
+}
+```
+
+## Terapkan kebijakan ke Vault:
+
+```bash
+vault policy write jenkins-policy jenkins-policy.hcl
+```
+
+## Buat role jenkins-role dan hubungkan dengan kebijakan jenkins-policy:
+
+```bash
+vault auth enable approle
+vault write auth/approle/role/jenkins-role token_policies="jenkins-policy"
+```
+
+## Dapatkan Role ID dan Secret ID untuk digunakan di Jenkins:
+
+```bash
+vault read auth/approle/role/jenkins-role/role-id
+vault write -f auth/approle/role/jenkins-role/secret-id
+```
