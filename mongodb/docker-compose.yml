@@ -1,0 +1,55 @@
+version: "3.8"
+
+services:
+  mongodb-primary:
+    image: "bitnami/mongodb:latest"
+    container_name: mongodb-primary
+    environment:
+      - MONGODB_ADVERTISED_HOSTNAME=mongodb-primary
+      - MONGODB_REPLICA_SET_MODE=primary
+      - MONGODB_ROOT_PASSWORD=${MONGO_INITDB_ROOT_PASSWORD}
+      - MONGODB_REPLICA_SET_KEY=${MONGODB_REPLICA_SET_KEY}
+      - MONGODB_REPLICA_SET_NAME=${MONGODB_REPLICA_SET_NAME}
+      - MONGODB_PORT_NUMBER=27011
+    volumes:
+      - "./docker-data/mongodb-primary:/bitnami/mongodb:rw"
+    ports:
+      - 27011:27011
+
+  mongodb-secondary:
+    image: "bitnami/mongodb:latest"
+    container_name: mongodb-secondary
+    depends_on:
+      - mongodb-primary
+    environment:
+      - MONGODB_ADVERTISED_HOSTNAME=mongodb-secondary
+      - MONGODB_REPLICA_SET_MODE=secondary
+      - MONGODB_INITIAL_PRIMARY_HOST=mongodb-primary
+      - MONGODB_INITIAL_PRIMARY_PORT_NUMBER=27011
+      - MONGODB_INITIAL_PRIMARY_ROOT_PASSWORD=${MONGO_INITDB_ROOT_PASSWORD}
+      - MONGODB_REPLICA_SET_KEY=${MONGODB_REPLICA_SET_KEY}
+      - MONGODB_REPLICA_SET_NAME=${MONGODB_REPLICA_SET_NAME}
+      - MONGODB_PORT_NUMBER=27012
+    volumes:
+      - "./docker-data/mongodb-secondary:/bitnami/mongodb:rw"
+    ports:
+      - 27012:27012
+
+  mongodb-arbiter:
+    image: "bitnami/mongodb:latest"
+    container_name: mongodb-arbiter
+    depends_on:
+      - mongodb-primary
+    environment:
+      - MONGODB_ADVERTISED_HOSTNAME=mongodb-arbiter
+      - MONGODB_REPLICA_SET_MODE=arbiter
+      - MONGODB_INITIAL_PRIMARY_HOST=mongodb-primary
+      - MONGODB_INITIAL_PRIMARY_PORT_NUMBER=27011
+      - MONGODB_INITIAL_PRIMARY_ROOT_PASSWORD=${MONGO_INITDB_ROOT_PASSWORD}
+      - MONGODB_REPLICA_SET_KEY=${MONGODB_REPLICA_SET_KEY}
+      - MONGODB_REPLICA_SET_NAME=${MONGODB_REPLICA_SET_NAME}
+      - MONGODB_PORT_NUMBER=27010
+    volumes:
+      - "./docker-data/mongodb-arbiter:/bitnami/mongodb:rw"
+    ports:
+      - 27010:27010

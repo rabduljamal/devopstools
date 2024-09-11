@@ -62,11 +62,11 @@ Buat file kebijakan jenkins-policy.hcl dengan konten berikut:
 
 ```hcl
 # jenkins-policy.hcl
-path "kv/data/perizinan-event-stage/*" {
+path "kv/data/secret-stage/*" {
   capabilities = ["read", "list"]
 }
 
-path "kv/data/perizinan-event-production/*" {
+path "kv/data/secret-production/*" {
   capabilities = ["read", "list"]
 }
 ```
@@ -90,3 +90,77 @@ vault write auth/approle/role/jenkins-role token_policies="jenkins-policy"
 vault read auth/approle/role/jenkins-role/role-id
 vault write -f auth/approle/role/jenkins-role/secret-id
 ```
+
+## Konfigurasi Vault
+
+Buat Kebijakan untuk Jenkins
+Tentukan kebijakan yang memberikan izin akses ke paths secrets yang diinginkan:
+
+Buat file kebijakan jenkins-policy.hcl dengan konten berikut:
+
+```
+# jenkins-policy.hcl
+path "kv/data/secret-stage/*" {
+  capabilities = ["read", "list"]
+}
+
+path "kv/data/secret-production/*" {
+  capabilities = ["read", "list"]
+}
+```
+
+Terapkan kebijakan ke Vault:
+
+```bash
+vault policy write jenkins-policy jenkins-policy.hcl
+```
+
+Buat role jenkins-role dan hubungkan dengan kebijakan jenkins-policy:
+
+```bash
+vault auth enable approle
+vault write auth/approle/role/jenkins-role token_policies="jenkins-policy"
+```
+
+Dapatkan Role ID dan Secret ID untuk digunakan di Jenkins:
+
+```bash
+vault read auth/approle/role/jenkins-role/role-id
+vault write -f auth/approle/role/jenkins-role/secret-id
+```
+
+Aktifkan Metode Userpass Auth di Vault
+Vault memiliki metode autentikasi bernama Userpass yang memungkinkan login menggunakan kombinasi username dan password. Anda harus mengaktifkan metode ini terlebih dahulu.
+
+```bash
+vault auth enable userpass
+```
+
+Buat Kebijakan untuk Pengguna UI
+Setelah mengaktifkan metode autentikasi Userpass, kita perlu membuat kebijakan (policy) yang menentukan izin akses untuk pengguna UI. Misalnya, kita buat kebijakan yang hanya memungkinkan akses baca pada secrets tertentu.
+
+```
+# user-policy.hcl
+path "kv/data/secret-stage/*" {
+  capabilities = ["create", "read", "update", "delete", "list"]
+}
+
+path "kv/data/secret-production/*" {
+  capabilities = ["create", "read", "update", "delete", "list"]
+}
+```
+
+Kemudian, buat kebijakan ini di Vault:
+
+```bash
+vault policy write user-policy user-policy.hcl
+```
+
+Buat User dengan Kredensial User Password
+Sekarang kita akan membuat pengguna menggunakan metode Userpass dengan kebijakan yang sudah kita buat.
+
+```bash
+vault write auth/userpass/users/your-username password="your-password" policies="user-policy"
+```
+
+Gantilah your-username dengan nama pengguna yang Anda inginkan dan your-password dengan kata sandi yang Anda inginkan.
