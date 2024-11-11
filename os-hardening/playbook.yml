@@ -5,7 +5,7 @@
     # Users yang diizinkan
     os_security_users_allow:
       - "root"
-      - "rjamal"
+      - "deploy"
 
     sysctl_overwrite:
       net.ipv4.ip_forward: 1
