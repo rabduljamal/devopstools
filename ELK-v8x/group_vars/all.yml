@@ -1,0 +1,6 @@
+---
+elastic_version: "8.12.0"
+elastic_password: "changeme123secure"
+kibana_password: "changeme123secure"
+elk_network: "elk-network"
+namespace: "elk-stack"

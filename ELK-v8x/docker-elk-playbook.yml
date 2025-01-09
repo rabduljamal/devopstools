@@ -1,0 +1,97 @@
+---
+- name: Deploy ELK Stack using Docker
+  hosts: elk_servers
+  become: true
+  vars_files:
+    - group_vars/all.yml
+
+  pre_tasks:
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+      when: ansible_os_family == "Debian"
+
+  tasks:
+    - name: Install required packages
+      ansible.builtin.package:
+        name:
+          - docker
+          - docker-compose
+          - python3-docker
+        state: present
+
+    - name: Ensure Docker service is running
+      ansible.builtin.service:
+        name: docker
+        state: started
+        enabled: yes
+
+    - name: Create Docker network for ELK
+      community.docker.docker_network:
+        name: "{{ elk_network }}"
+        state: present
+
+    - name: Create directories for ELK data
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        mode: "0755"
+      loop:
+        - /opt/elk/elasticsearch/data
+        - /opt/elk/elasticsearch/config
+        - /opt/elk/logstash/config
+        - /opt/elk/logstash/pipeline
+        - /opt/elk/kibana/config
+
+    - name: Deploy Elasticsearch container
+      community.docker.docker_container:
+        name: elasticsearch
+        image: "docker.elastic.co/elasticsearch/elasticsearch:{{ elastic_version }}"
+        state: started
+        restart_policy: always
+        networks:
+          - name: "{{ elk_network }}"
+        env:
+          discovery.type: single-node
+          ES_JAVA_OPTS: "-Xms512m -Xmx512m"
+          ELASTIC_PASSWORD: "{{ elastic_password }}"
+          xpack.security.enabled: "true"
+        ports:
+          - "9200:9200"
+        volumes:
+          - /opt/elk/elasticsearch/data:/usr/share/elasticsearch/data
+          - /opt/elk/elasticsearch/config:/usr/share/elasticsearch/config
+
+    - name: Deploy Logstash container
+      community.docker.docker_container:
+        name: logstash
+        image: "docker.elastic.co/logstash/logstash:{{ elastic_version }}"
+        state: started
+        restart_policy: always
+        networks:
+          - name: "{{ elk_network }}"
+        env:
+          LS_JAVA_OPTS: "-Xms256m -Xmx256m"
+        ports:
+          - "5044:5044"
+          - "5000:5000"
+        volumes:
+          - /opt/elk/logstash/config:/usr/share/logstash/config
+          - /opt/elk/logstash/pipeline:/usr/share/logstash/pipeline
+
+    - name: Deploy Kibana container
+      community.docker.docker_container:
+        name: kibana
+        image: "docker.elastic.co/kibana/kibana:{{ elastic_version }}"
+        state: started
+        restart_policy: always
+        networks:
+          - name: "{{ elk_network }}"
+        env:
+          ELASTICSEARCH_HOSTS: "http://elasticsearch:9200"
+          ELASTICSEARCH_USERNAME: "kibana_system"
+          ELASTICSEARCH_PASSWORD: "{{ kibana_password }}"
+        ports:
+          - "5601:5601"
+        volumes:
+          - /opt/elk/kibana/config:/usr/share/kibana/config

@@ -1,0 +1,221 @@
+---
+- name: Deploy ELK Stack on K3s
+  hosts: k3s_master
+  become: true
+  vars_files:
+    - group_vars/all.yml
+
+  tasks:
+    - name: Create namespace
+      kubernetes.core.k8s:
+        name: "{{ namespace }}"
+        api_version: v1
+        kind: Namespace
+        state: present
+
+    - name: Create storage class
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: storage.k8s.io/v1
+          kind: StorageClass
+          metadata:
+            name: elk-storage
+          provisioner: local-path
+          volumeBindingMode: WaitForFirstConsumer
+
+    - name: Create persistent volumes
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: v1
+          kind: PersistentVolumeClaim
+          metadata:
+            name: "{{ item }}-pvc"
+            namespace: "{{ namespace }}"
+          spec:
+            accessModes:
+              - ReadWriteOnce
+            storageClassName: elk-storage
+            resources:
+              requests:
+                storage: 10Gi
+      loop:
+        - elasticsearch
+        - logstash
+        - kibana
+
+    - name: Deploy Elasticsearch
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: apps/v1
+          kind: StatefulSet
+          metadata:
+            name: elasticsearch
+            namespace: "{{ namespace }}"
+          spec:
+            serviceName: elasticsearch
+            replicas: 1
+            selector:
+              matchLabels:
+                app: elasticsearch
+            template:
+              metadata:
+                labels:
+                  app: elasticsearch
+              spec:
+                containers:
+                  - name: elasticsearch
+                    image: "docker.elastic.co/elasticsearch/elasticsearch:{{ elastic_version }}"
+                    ports:
+                      - containerPort: 9200
+                    env:
+                      - name: discovery.type
+                        value: single-node
+                      - name: ES_JAVA_OPTS
+                        value: "-Xms512m -Xmx512m"
+                      - name: ELASTIC_PASSWORD
+                        value: "{{ elastic_password }}"
+                      - name: xpack.security.enabled
+                        value: "true"
+                    volumeMounts:
+                      - name: elasticsearch-data
+                        mountPath: /usr/share/elasticsearch/data
+                volumes:
+                  - name: elasticsearch-data
+                    persistentVolumeClaim:
+                      claimName: elasticsearch-pvc
+
+    - name: Create Elasticsearch Service
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: v1
+          kind: Service
+          metadata:
+            name: elasticsearch
+            namespace: "{{ namespace }}"
+          spec:
+            selector:
+              app: elasticsearch
+            ports:
+              - port: 9200
+                targetPort: 9200
+            type: ClusterIP
+
+    - name: Deploy Logstash
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: apps/v1
+          kind: Deployment
+          metadata:
+            name: logstash
+            namespace: "{{ namespace }}"
+          spec:
+            replicas: 1
+            selector:
+              matchLabels:
+                app: logstash
+            template:
+              metadata:
+                labels:
+                  app: logstash
+              spec:
+                containers:
+                  - name: logstash
+                    image: "docker.elastic.co/logstash/logstash:{{ elastic_version }}"
+                    ports:
+                      - containerPort: 5044
+                      - containerPort: 5000
+                    env:
+                      - name: LS_JAVA_OPTS
+                        value: "-Xms256m -Xmx256m"
+                    volumeMounts:
+                      - name: logstash-config
+                        mountPath: /usr/share/logstash/config
+                      - name: logstash-pipeline
+                        mountPath: /usr/share/logstash/pipeline
+                volumes:
+                  - name: logstash-config
+                    persistentVolumeClaim:
+                      claimName: logstash-pvc
+                  - name: logstash-pipeline
+                    persistentVolumeClaim:
+                      claimName: logstash-pvc
+
+    - name: Create Logstash Service
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: v1
+          kind: Service
+          metadata:
+            name: logstash
+            namespace: "{{ namespace }}"
+          spec:
+            selector:
+              app: logstash
+            ports:
+              - port: 5044
+                targetPort: 5044
+              - port: 5000
+                targetPort: 5000
+            type: ClusterIP
+
+    - name: Deploy Kibana
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: apps/v1
+          kind: Deployment
+          metadata:
+            name: kibana
+            namespace: "{{ namespace }}"
+          spec:
+            replicas: 1
+            selector:
+              matchLabels:
+                app: kibana
+            template:
+              metadata:
+                labels:
+                  app: kibana
+              spec:
+                containers:
+                  - name: kibana
+                    image: "docker.elastic.co/kibana/kibana:{{ elastic_version }}"
+                    ports:
+                      - containerPort: 5601
+                    env:
+                      - name: ELASTICSEARCH_HOSTS
+                        value: "http://elasticsearch:9200"
+                      - name: ELASTICSEARCH_USERNAME
+                        value: "kibana_system"
+                      - name: ELASTICSEARCH_PASSWORD
+                        value: "{{ kibana_password }}"
+                    volumeMounts:
+                      - name: kibana-config
+                        mountPath: /usr/share/kibana/config
+                volumes:
+                  - name: kibana-config
+                    persistentVolumeClaim:
+                      claimName: kibana-pvc
+
+    - name: Create Kibana Service
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: v1
+          kind: Service
+          metadata:
+            name: kibana
+            namespace: "{{ namespace }}"
+          spec:
+            selector:
+              app: kibana
+            ports:
+              - port: 5601
+                targetPort: 5601
+            type: NodePort
